@@ -99,7 +99,12 @@ function studentLogin_(id) {
 
   clearLoginFailures_(rateKey);
   const token = createSessionToken_('student', {student_id:s.student_id}, sessionSeconds_('STUDENT_SESSION_SECONDS'));
-  return {student_token:token, student:publicStudent_(s), expires_in:sessionSeconds_('STUDENT_SESSION_SECONDS')};
+  return {
+    student_token:token,
+    student:publicStudent_(s),
+    records:getStudentRecords_(s).map(publicRecord_),
+    expires_in:sessionSeconds_('STUDENT_SESSION_SECONDS')
+  };
 }
 
 function recordsResponse_(studentToken) {
@@ -407,8 +412,7 @@ function deleteRecord_(p) {
     const ss = SpreadsheetApp.openById(DATA_SPREADSHEET_ID);
     for (const type of Object.keys(CONFIG)) {
       const sh = ss.getSheetByName(CONFIG[type].sheet);
-      if (!sh) continue;
-      const row = findEntryRow_(sh, entryId, CONFIG[type])…4699 tokens truncated…
+      if …4718 tokens truncated…
   if (last < 2) return [];
   return sh.getRange(2, 1, last - 1, sh.getLastColumn()).getDisplayValues()
     .map(row => studentFromRow_(row, headers))
