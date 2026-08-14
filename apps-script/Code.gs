@@ -14,6 +14,11 @@ const EVIDENCE_FOLDER_ID = '1BPExo71uPO1WPc1L1GP3mlK1TDDZx2Kb';
 const ATTACHMENT_SHEET = 'attachments';
 const REVIEW_SHEET = 'reviews';
 const DASHBOARD_CACHE_SECONDS = 90;
+const STUDENT_CACHE_SECONDS = 600;
+const STUDENT_RECORD_CACHE_SECONDS = 120;
+const STUDENT_HEADER_CACHE_SECONDS = 21600;
+const ENTRY_ID_HEADER = 'entry_id';
+const DATA_CACHE_VERSION = 'v3';
 const DEFAULT_SESSION_SECONDS = 21600; // 6 ชั่วโมง
 const DEFAULT_LOGIN_MAX_ATTEMPTS = 5;
 const DEFAULT_LOGIN_LOCK_SECONDS = 900; // 15 นาที
@@ -129,6 +134,7 @@ function updateStudentEmail_(studentToken, email) {
   }
 
   student.email = email;
+  clearStudentCache_(student.student_id);
   return {success:true, student:publicStudent_(student)};
 }
 
@@ -146,6 +152,12 @@ function studentSheet_() {
 }
 
 function studentHeaderMap_(sh) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'student-headers:' + DATA_CACHE_VERSION;
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (_) {}
+  }
   const width = Math.max(sh.getLastColumn(), 1);
   const values = sh.getRange(1, 1, 1, width).getDisplayValues()[0];
   const map = {};
@@ -153,6 +165,7 @@ function studentHeaderMap_(sh) {
     const key = String(value || '').trim().toLowerCase();
     if (key) map[key] = index + 1;
   });
+  try { cache.put(cacheKey, JSON.stringify(map), STUDENT_HEADER_CACHE_SECONDS); } catch (_) {}
   return map;
 }
 
@@ -183,6 +196,13 @@ function lookupStudent_(id) {
   id = normalizeDigits_(id);
   if (!id) return null;
 
+  const cache = CacheService.getScriptCache();
+  const cacheKey = studentCacheKey_(id);
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (_) {}
+  }
+
   const sh = studentSheet_();
   const headers = studentHeaderMap_(sh);
   const idColumn = requiredStudentColumn_(headers, 'student_id');
@@ -193,7 +213,27 @@ function lookupStudent_(id) {
   const found = sh.getRange(2, idColumn, last - 1, 1).createTextFinder(id).matchEntireCell(true).findNext();
   if (!found) return null;
   const row = sh.getRange(found.getRow(), 1, 1, sh.getLastColumn()).getDisplayValues()[0];
-  return studentFromRow_(row, headers);
+  const student = studentFromRow_(row, headers);
+  try { cache.put(cacheKey, JSON.stringify(student), STUDENT_CACHE_SECONDS); } catch (_) {}
+  return student;
+}
+
+function studentCacheKey_(studentId) {
+  return 'student:' + DATA_CACHE_VERSION + ':' + secureKey_(studentId);
+}
+
+function studentRecordCacheKey_(citizenId) {
+  return 'student-records:' + DATA_CACHE_VERSION + ':' + secureKey_(citizenId);
+}
+
+function clearStudentCache_(studentId) {
+  if (!studentId) return;
+  CacheService.getScriptCache().remove(studentCacheKey_(studentId));
+}
+
+function clearStudentRecordCache_(student) {
+  if (!student || !student.citizen_id) return;
+  CacheService.getScriptCache().remove(studentRecordCacheKey_(student.citizen_id));
 }
 
 function publicStudent_(s) {
@@ -218,6 +258,13 @@ function requireStudentSession_(token) {
 
 /* ========================= RECORDS ========================= */
 function getStudentRecords_(student) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = studentRecordCacheKey_(student.citizen_id);
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (_) {}
+  }
+
   const ss = SpreadsheetApp.openById(DATA_SPREADSHEET_ID);
   const out = [];
 
@@ -226,16 +273,15 @@ function getStudentRecords_(student) {
     const sh = ss.getSheetByName(cfg.sheet);
     if (!sh || sh.getLastRow() < 2) return;
 
-    const rows = sh.getLastRow() - 1;
-    const values = sh.getRange(2, 1, rows, cfg.headers.length).getDisplayValues();
-    const notes = sh.getRange(2, 1, rows, 1).getNotes();
-
-    values.forEach((r, i) => {
-      if (String(r[0] || '') !== student.citizen_id) return;
-      let entryId = notes[i][0] || '';
+    const entryIdColumn = recordEntryIdColumn_(sh, cfg, false);
+    const width = Math.max(cfg.headers.length, entryIdColumn || 0);
+    matchingRows_(sh, 1, student.citizen_id, width).forEach(match => {
+      const r = match.values;
+      let entryId = entryIdColumn ? String(r[entryIdColumn - 1] || '').trim() : '';
+      if (!entryId) entryId = String(sh.getRange(match.row, 1).getNote() || '').trim();
       if (!entryId) {
         entryId = Utilities.getUuid();
-        sh.getRange(i + 2, 1).setNote(entryId);
+        sh.getRange(match.row, 1).setNote(entryId);
       }
       const item = {type:type, entry_id:entryId};
       cfg.headers.forEach((h, j) => item[h] = r[j] || '');
@@ -249,7 +295,35 @@ function getStudentRecords_(student) {
     r.attachments = attachmentMap[r.entry_id] || [];
     r.review = reviewMap[r.entry_id] || null;
   });
+  try { cache.put(cacheKey, JSON.stringify(out), STUDENT_RECORD_CACHE_SECONDS); } catch (_) {}
   return out;
+}
+
+function matchingRows_(sh, column, value, width) {
+  const last = sh.getLastRow();
+  if (last < 2 || !String(value || '').trim()) return [];
+  const found = sh.getRange(2, column, last - 1, 1)
+    .createTextFinder(String(value))
+    .matchEntireCell(true)
+    .useRegularExpression(false)
+    .findAll();
+  return found.map(cell => {
+    const row = cell.getRow();
+    return {row:row, values:sh.getRange(row, 1, 1, width).getDisplayValues()[0]};
+  });
+}
+
+function recordEntryIdColumn_(sh, cfg, createIfMissing) {
+  const column = cfg.headers.length + 1;
+  if (sh.getMaxColumns() < column && createIfMissing) {
+    sh.insertColumnsAfter(sh.getMaxColumns(), column - sh.getMaxColumns());
+  }
+  if (sh.getMaxColumns() < column) return 0;
+  const current = String(sh.getRange(1, column).getDisplayValue() || '').trim().toLowerCase();
+  if (current === ENTRY_ID_HEADER) return column;
+  if (!createIfMissing) return 0;
+  sh.getRange(1, column).setValue(ENTRY_ID_HEADER);
+  return column;
 }
 
 function saveRecord_(p) {
@@ -266,10 +340,14 @@ function saveRecord_(p) {
 
     const target = Math.max(sh.getLastRow() + 1, 2);
     const entryId = Utilities.getUuid();
-    sh.getRange(target, 1, 1, cfg.headers.length).setValues([studentRow_(student, cfg, p)]).setVerticalAlignment('top').setWrap(true);
-    sh.getRange(target, 1).setNumberFormat('@').setNote(entryId);
+    const entryIdColumn = recordEntryIdColumn_(sh, cfg, true);
+    const row = studentRow_(student, cfg, p).concat([entryId]);
+    sh.getRange(target, 1, 1, entryIdColumn).setValues([row]).setVerticalAlignment('top').setWrap(true);
+    sh.getRange(target, 1).setNumberFormat('@');
+    sh.getRange(target, entryIdColumn).setNumberFormat('@');
 
     const attachments = uploadEvidence_(student, type, entryId, String(p.year || ''), p.images || []);
+    clearStudentRecordCache_(student);
     clearTeacherDashboardCache_();
     return {entry_id:entryId, attachments:attachments};
   } finally {
@@ -290,14 +368,17 @@ function updateRecord_(p) {
   try {
     const sh = SpreadsheetApp.openById(DATA_SPREADSHEET_ID).getSheetByName(cfg.sheet);
     if (!sh) throw new Error('ไม่พบชีต ' + cfg.sheet);
-    const row = findEntryRow_(sh, entryId);
+    const row = findEntryRow_(sh, entryId, cfg);
     if (!row) throw new Error('ไม่พบรายการที่ต้องการแก้ไข');
     if (String(sh.getRange(row, 1).getDisplayValue()) !== student.citizen_id) throw new Error('ไม่มีสิทธิ์แก้ไขรายการนี้');
 
-    sh.getRange(row, 1, 1, cfg.headers.length).setValues([studentRow_(student, cfg, p)]).setVerticalAlignment('top').setWrap(true);
-    sh.getRange(row, 1).setNumberFormat('@').setNote(entryId);
+    const entryIdColumn = recordEntryIdColumn_(sh, cfg, true);
+    sh.getRange(row, 1, 1, entryIdColumn).setValues([studentRow_(student, cfg, p).concat([entryId])]).setVerticalAlignment('top').setWrap(true);
+    sh.getRange(row, 1).setNumberFormat('@');
+    sh.getRange(row, entryIdColumn).setNumberFormat('@');
     const attachments = uploadEvidence_(student, type, entryId, String(p.year || ''), p.images || []);
     markReviewResubmitted_(entryId, student.citizen_id);
+    clearStudentRecordCache_(student);
     clearTeacherDashboardCache_();
     return {entry_id:entryId, attachments:attachments};
   } finally {
@@ -317,12 +398,13 @@ function deleteRecord_(p) {
     for (const type of Object.keys(CONFIG)) {
       const sh = ss.getSheetByName(CONFIG[type].sheet);
       if (!sh) continue;
-      const row = findEntryRow_(sh, entryId);
+      const row = findEntryRow_(sh, entryId, CONFIG[type]);
       if (!row) continue;
       if (String(sh.getRange(row, 1).getDisplayValue()) !== student.citizen_id) throw new Error('ไม่มีสิทธิ์ลบรายการนี้');
       deleteAttachmentsForEntry_(entryId, student.citizen_id);
       deleteReviewForEntry_(entryId, student.citizen_id);
       sh.deleteRow(row);
+      clearStudentRecordCache_(student);
       clearTeacherDashboardCache_();
       return {entry_id:entryId};
     }
@@ -332,9 +414,18 @@ function deleteRecord_(p) {
   }
 }
 
-function findEntryRow_(sh, entryId) {
+function findEntryRow_(sh, entryId, cfg) {
   const last = sh.getLastRow();
   if (last < 2) return 0;
+  const entryIdColumn = recordEntryIdColumn_(sh, cfg, false);
+  if (entryIdColumn) {
+    const found = sh.getRange(2, entryIdColumn, last - 1, 1)
+      .createTextFinder(String(entryId))
+      .matchEntireCell(true)
+      .useRegularExpression(false)
+      .findNext();
+    if (found) return found.getRow();
+  }
   const notes = sh.getRange(2, 1, last - 1, 1).getNotes();
   for (let i = 0; i < notes.length; i++) if (notes[i][0] === entryId) return i + 2;
   return 0;
@@ -420,8 +511,8 @@ function getAttachmentMap_(citizenId) {
   const sh = SpreadsheetApp.openById(DATA_SPREADSHEET_ID).getSheetByName(ATTACHMENT_SHEET);
   const map = {};
   if (!sh || sh.getLastRow() < 2) return map;
-  sh.getRange(2, 1, sh.getLastRow() - 1, ATT_HEADERS.length).getDisplayValues().forEach(row => {
-    if (String(row[2] || '').trim() !== String(citizenId || '').trim()) return;
+  matchingRows_(sh, 3, citizenId, ATT_HEADERS.length).forEach(match => {
+    const row = match.values;
     const entryId = String(row[1] || '').trim();
     if (!entryId) return;
     if (!map[entryId]) map[entryId] = [];
@@ -452,8 +543,8 @@ function getReviewMap_(citizenId) {
   const sh = SpreadsheetApp.openById(DATA_SPREADSHEET_ID).getSheetByName(REVIEW_SHEET);
   const map = {};
   if (!sh || sh.getLastRow() < 2) return map;
-  sh.getRange(2, 1, sh.getLastRow() - 1, REVIEW_HEADERS.length).getDisplayValues().forEach(row => {
-    if (String(row[2] || '').trim() !== String(citizenId || '').trim()) return;
+  matchingRows_(sh, 3, citizenId, REVIEW_HEADERS.length).forEach(match => {
+    const row = match.values;
     const entryId = String(row[1] || '').trim();
     if (!entryId) return;
     map[entryId] = reviewFromRow_(row);
@@ -514,7 +605,7 @@ function teacherLogin_(teacherCode) {
   clearLoginFailures_(rateKey);
   const seconds = sessionSeconds_('TEACHER_SESSION_SECONDS');
   const token = createSessionToken_('teacher', {role:'teacher'}, seconds);
-  return {teacher_token:token, expires_in:seconds, dashboard:teacherDashboardData_()};
+  return {teacher_token:token, expires_in:seconds, dashboard:teacherDashboardResponse_(token, false)};
 }
 
 function teacherLogout_(teacherToken) {
@@ -601,6 +692,7 @@ function teacherReviewResponse_(teacherToken, payload) {
     if (foundIndex >= 0) sh.getRange(foundIndex + 2, 1, 1, REVIEW_HEADERS.length).setValues([row]);
     else sh.getRange(sh.getLastRow() + 1, 1, 1, REVIEW_HEADERS.length).setValues([row]);
 
+    clearStudentRecordCache_(student);
     clearTeacherDashboardCache_();
     const review = reviewFromRow_(row);
     return {review:review, email_message:notifyStudentReview_(student, record, review)};
@@ -770,13 +862,16 @@ function setupSheets_() {
     const cfg = CONFIG[type];
     let sh = ss.getSheetByName(cfg.sheet);
     if (!sh) sh = ss.insertSheet(cfg.sheet);
-    if (sh.getMaxColumns() < cfg.headers.length) sh.insertColumnsAfter(sh.getMaxColumns(), cfg.headers.length - sh.getMaxColumns());
+    const requiredColumns = cfg.headers.length + 1;
+    if (sh.getMaxColumns() < requiredColumns) sh.insertColumnsAfter(sh.getMaxColumns(), requiredColumns - sh.getMaxColumns());
 
     const head = sh.getRange(1, 1, 1, cfg.headers.length);
     const current = head.getDisplayValues()[0];
     if (cfg.headers.some((h, i) => current[i] !== h)) head.setValues([cfg.headers]);
 
-    head.setBackground('#17365D').setFontColor('#FFFFFF').setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle').setWrap(true);
+    const entryIdColumn = recordEntryIdColumn_(sh, cfg, true);
+    migrateEntryIds_(sh, cfg, entryIdColumn);
+    sh.getRange(1, 1, 1, entryIdColumn).setBackground('#17365D').setFontColor('#FFFFFF').setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle').setWrap(true);
     sh.setFrozenRows(1);
     sh.getRange('A:A').setNumberFormat('@');
 
@@ -809,6 +904,24 @@ function setupSheets_() {
     reviews.getRange('B:D').setNumberFormat('@');
     reviews.getRange('G:G').setNumberFormat('@');
     reviews.getRange('L:L').setNumberFormat('@');
+}
+
+function migrateEntryIds_(sh, cfg, entryIdColumn) {
+  const rowCount = Math.max(sh.getLastRow() - 1, 0);
+  if (!rowCount) return;
+  const citizens = sh.getRange(2, 1, rowCount, 1).getDisplayValues();
+  const current = sh.getRange(2, entryIdColumn, rowCount, 1).getDisplayValues();
+  const notes = sh.getRange(2, 1, rowCount, 1).getNotes();
+  let changed = false;
+  const values = current.map((row, index) => {
+    let entryId = String(row[0] || '').trim();
+    if (!entryId && String(citizens[index][0] || '').trim()) {
+      entryId = String(notes[index][0] || '').trim() || Utilities.getUuid();
+      changed = true;
+    }
+    return [entryId];
+  });
+  if (changed) sh.getRange(2, entryIdColumn, rowCount, 1).setNumberFormat('@').setValues(values);
 }
 
 /**
