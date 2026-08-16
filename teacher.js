@@ -70,6 +70,6 @@ $('teacherStatus')?.addEventListener('change',e=>{statusFilter=e.target.value;re
 $('teacherType')?.addEventListener('change',e=>{typeFilter=e.target.value;renderStudents()});
 $('teacherDetailBackBtn')?.addEventListener('click',()=>showTeacher('teacherDashboardView'));
 
-if(!document.querySelector('script[data-evidence]')){const s=document.createElement('script');s.src='attachments.js?v=20260810-2008';s.dataset.evidence='1';document.body.appendChild(s)}
+if(!document.querySelector('script[data-evidence]')){const s=document.createElement('script');s.src='attachments.js?v=20260816-upload-v2';s.dataset.evidence='1';document.body.appendChild(s)}
 })();
 
