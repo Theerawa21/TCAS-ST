@@ -687,7 +687,7 @@ function teacherDashboardResponse_(teacherToken, forceRefresh) {
     try { return JSON.parse(cached); } catch (_) {}
   }
   const data = teacherDashboardData_();
-  cache.put(key, JSON.stringify(data), DASHBOARD_CACHE_SECONDS);
+  try { cache.put(key, JSON.stringify(data), DASHBOARD_CACHE_SECONDS); } catch (_) {}
   return data;
 }
 
