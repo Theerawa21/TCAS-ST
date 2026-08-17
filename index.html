@@ -13,8 +13,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260814-v22">
-  <link rel="stylesheet" href="teacher.css?v=20260814-v22">
+  <link rel="stylesheet" href="styles.css?v=20260817-v25">
+  <link rel="stylesheet" href="teacher.css?v=20260817-v25">
 </head>
 <body>
 <header class="topbar">
@@ -33,7 +33,9 @@
 <main class="shell">
 <section id="setupView" class="view center-view hidden"><div class="auth-card"><div class="hero-icon">⚙️</div><h2>ตั้งค่าการเชื่อมต่อครั้งแรก</h2><p class="lead">เว็บ GitHub Pages พร้อมแล้ว แต่ต้องเชื่อมกับ Google Apps Script Web App ก่อน จึงจะค้นหานักเรียนและบันทึกลง Google Sheet ได้</p><div class="field"><label>Apps Script Web App URL</label><input id="backendInput" type="url" placeholder="https://script.google.com/macros/s/.../exec"></div><div id="setupError" class="error hidden"></div><button id="saveBackendBtn" class="btn btn-primary btn-block" type="button">บันทึกการเชื่อมต่อ</button><div class="config-box hint">สำหรับผู้ดูแลระบบเท่านั้น หลังตั้งค่าแล้ว URL จะถูกเก็บในเบราว์เซอร์เครื่องนี้</div></div></section>
 
-<section id="loginView" class="view center-view hidden"><div class="auth-card"><div class="hero-icon">🎓</div><h2>เข้าสู่ระบบนักเรียน</h2><p class="lead">กรอกรหัสประจำตัวนักเรียนเพื่อยืนยันตัวตนก่อนบันทึกผลงาน</p><form id="loginForm"><div class="field"><label>รหัสประจำตัวนักเรียน <span class="required">*</span></label><input id="studentCode" class="student-code" inputmode="numeric" autocomplete="username" maxlength="10" required placeholder="เช่น 13999"><div class="hint">กรอกเฉพาะตัวเลขรหัสประจำตัวนักเรียน</div></div><div id="loginError" class="error hidden"></div><button class="btn btn-primary btn-block" type="submit">ตรวจสอบข้อมูล</button></form></div></section>
+<section id="levelView" class="view center-view hidden"><div class="auth-card"><div class="hero-icon">🎒</div><h2>เลือกระดับชั้น</h2><p class="lead">เลือกระดับชั้นของคุณก่อน จากนั้นจึงกรอกรหัสประจำตัวนักเรียนเพื่อเข้าสู่ระบบบันทึกผลงาน</p><div class="level-select-grid"><button class="level-select-btn" type="button" data-level="ม.4">ม.4<small>มัธยมศึกษาปีที่ 4</small></button><button class="level-select-btn" type="button" data-level="ม.5">ม.5<small>มัธยมศึกษาปีที่ 5</small></button><button class="level-select-btn" type="button" data-level="ม.6">ม.6<small>มัธยมศึกษาปีที่ 6</small></button></div></div></section>
+
+<section id="loginView" class="view center-view hidden"><div class="auth-card"><div class="hero-icon">🎓</div><div class="level-chip">ระดับชั้น <strong id="loginLevelText">-</strong><button id="changeLevelBtn" type="button">เปลี่ยนระดับชั้น</button></div><h2>เข้าสู่ระบบนักเรียน</h2><p class="lead">กรอกรหัสประจำตัวนักเรียนเพื่อยืนยันตัวตนก่อนบันทึกผลงาน</p><form id="loginForm"><div class="field"><label>รหัสประจำตัวนักเรียน <span class="required">*</span></label><input id="studentCode" class="student-code" inputmode="numeric" autocomplete="username" maxlength="10" required placeholder="เช่น 13999"><div class="hint">กรอกเฉพาะตัวเลขรหัสประจำตัวนักเรียน</div></div><div id="loginError" class="error hidden"></div><button class="btn btn-primary btn-block" type="submit">ตรวจสอบข้อมูล</button></form></div></section>
 
 <section id="confirmView" class="view center-view hidden"><div class="identity-card"><div class="identity-head"><div class="avatar">👤</div><div><div id="confirmName" class="identity-name">-</div><div class="identity-sub">กรุณาตรวจสอบว่าข้อมูลนี้เป็นของคุณ</div></div></div><div class="identity-grid"><div class="info-box"><div class="info-label">รหัสประจำตัวนักเรียน</div><div id="confirmStudentId" class="info-value">-</div></div><div class="info-box"><div class="info-label">ชั้น / ห้อง</div><div id="confirmClass" class="info-value">-</div></div></div><div class="field"><label for="confirmEmail">อีเมลสำหรับรับแจ้งผล <span class="required">*</span></label><input id="confirmEmail" type="email" inputmode="email" autocomplete="email" maxlength="254" required placeholder="student@example.com"><div class="hint">กรอกอีเมลที่ใช้งานได้จริง ระบบจะใช้แจ้งผลตรวจจากครู</div><div id="confirmEmailError" class="error hidden"></div></div><div class="notice">ระบบยืนยันตัวตนแล้วและจะไม่ส่งเลขบัตรประชาชน 13 หลักกลับมายังเบราว์เซอร์</div><div class="action-row"><button id="wrongBtn" class="btn btn-secondary" type="button">ไม่ใช่ข้อมูลของฉัน</button><button id="confirmBtn" class="btn btn-primary" type="button">บันทึกอีเมล · ดำเนินการต่อ</button></div></div></section>
 
@@ -70,6 +72,8 @@
       <div class="teacher-stat"><div id="teacherNotSent" class="value">0</div><div class="label">ยังไม่ส่งข้อมูล</div></div>
       <div class="teacher-stat"><div id="teacherRecords" class="value">0</div><div class="label">รายการผลงานทั้งหมด</div></div>
     </div>
+
+    <div id="teacherLevelTabs" class="level-tabs"></div>
 
     <div class="panel">
       <div class="toolbar"><h3>เลือกห้องเรียน</h3><span class="hint">กดที่ห้องเพื่อกรองรายชื่อ</span></div>
@@ -115,8 +119,8 @@ window.TCAS_CONFIG = {
   academicYear: '2569'
 };
 </script>
-<script src="app.js?v=20260816-v24"></script>
-<script src="teacher.js?v=20260816-v24"></script>
+<script src="app.js?v=20260817-v25"></script>
+<script src="teacher.js?v=20260817-v25"></script>
 </body>
 </html>
 

@@ -780,9 +780,15 @@ function notifyStudentReview_(student, record, review) {
       body:lines.join('\n'),
       name:SCHOOL_NAME
     });
-    return approved ? 'บันทึกผลและส่งอีเมลแจ้งนักเรียนแล้ว' : 'บันทึกข้อเสนอแนะและส่งอีเมลแจ้งนักเรียนแล้ว';
-  } catch (_) {
-    return 'บันทึกผลแล้ว แต่ส่งอีเมลไม่สำเร็จ';
+    return approved ? 'บันทึกผลผ่านแล้ว และส่งอีเมลแจ้งนักเรียนแล้ว' : 'บันทึกผลไม่ผ่านและข้อเสนอแนะแล้ว ส่งอีเมลแจ้งนักเรียนให้แก้ไขแล้ว';
+  } catch (err) {
+    // เก็บสาเหตุจริงไว้ใน log (Executions ใน Apps Script) และแจ้งครูตรง ๆ
+    // แทนที่จะกลืน error ทิ้งเงียบ ๆ เพื่อให้วินิจฉัยได้ว่าทำไมเมลไม่ส่ง
+    // (เช่น เกินโควตา MailApp ต่อวัน หรือยังไม่ได้ authorize สิทธิ์ส่งเมล)
+    console.error('notifyStudentReview_ sendEmail failed: ' + safeError_(err));
+    const reason = safeError_(err);
+    return (approved ? 'บันทึกผลผ่านแล้ว' : 'บันทึกผลไม่ผ่านและข้อเสนอแนะแล้ว') +
+      ' แต่ส่งอีเมลแจ้งนักเรียนไม่สำเร็จ (' + reason + ') กรุณาตรวจสอบว่า Deploy เป็นเวอร์ชันล่าสุด และอนุญาตสิทธิ์ส่งอีเมลของสคริปต์แล้ว';
   }
 }
 
