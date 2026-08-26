@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css?v=20260826-v26">
-  <link rel="stylesheet" href="teacher.css?v=20260826-v29">
+  <link rel="stylesheet" href="teacher.css?v=20260826-v30">
 </head>
 <body>
 <header class="topbar">
@@ -76,13 +76,13 @@
     <div id="teacherLevelTabs" class="level-tabs"></div>
 
     <div class="panel teacher-export-panel">
-      <div class="teacher-export-copy"><h3>ส่งออกข้อมูลสำหรับ Google Sheets</h3><p>เลือกข้อมูลตามระดับชั้นและประเภทผลงาน ระบบจะดาวน์โหลดไฟล์ CSV โดยไม่รวมเลขบัตรประชาชน</p></div>
+      <div class="teacher-export-copy"><h3>ส่งออกข้อมูลตามรูปแบบ TCAS</h3><p>เลือกข้อมูลตามระดับชั้นและประเภทผลงาน ระบบจะเรียงหัวคอลัมน์ให้ตรงกับไฟล์ต้นแบบแต่ละประเภท</p></div>
       <div class="teacher-export-controls">
         <label><span>ระดับชั้น</span><select id="teacherExportLevel"><option value="all">ทุกระดับชั้น</option><option value="ม.4">ม.4</option><option value="ม.5">ม.5</option><option value="ม.6">ม.6</option></select></label>
-        <label><span>ประเภทข้อมูล</span><select id="teacherExportType"><option value="all">ทุกประเภท</option><option value="activity">กิจกรรม</option><option value="prize">รางวัล</option><option value="project">โครงงาน</option><option value="course">หลักสูตร / Certificate</option></select></label>
+        <label><span>ประเภทข้อมูล</span><select id="teacherExportType"><option value="activity">กิจกรรม (activities.csv)</option><option value="prize">รางวัล (prizes.csv)</option><option value="project">โครงงาน (projects.csv)</option><option value="course">หลักสูตร (certs-courses.csv)</option></select></label>
         <button id="teacherExportBtn" class="btn btn-primary" type="button">⬇ ดาวน์โหลด CSV</button>
       </div>
-      <div id="teacherExportStatus" class="teacher-export-status" aria-live="polite"></div>
+      <div id="teacherExportStatus" class="teacher-export-status" aria-live="polite">ไฟล์มีข้อมูลเลขบัตรประชาชน กรุณาเก็บรักษาและใช้เฉพาะงานที่ได้รับอนุญาต</div>
     </div>
 
     <div class="panel">
@@ -137,8 +137,8 @@ window.TCAS_CONFIG = {
   academicYear: '2569'
 };
 </script>
-<script src="app.js?v=20260826-v29"></script>
-<script src="teacher.js?v=20260826-v29"></script>
+<script src="app.js?v=20260826-v30"></script>
+<script src="teacher.js?v=20260826-v30"></script>
 </body>
 </html>
 

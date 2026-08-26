@@ -33,6 +33,14 @@ const CONFIG = {
   course: {sheet:'certs-courses', headers:['citizen_id','title','first_name','last_name','course_name','course_level','description','issue_date','expired_date','score','year','category','level','hours','fee','reflection']}
 };
 
+// Exact TCAS CSV layouts supplied by the school. Keep order stable for imports.
+const EXPORT_HEADERS = {
+  activity:['citizen_id','title','first_name','last_name','program_title','exp_name','description','date','end_date','year','level','hours','fee'],
+  prize:['citizen_id','title','first_name','last_name','program_title','prize_name','description','date','end_date','year','level','hours','fee'],
+  project:['citizen_id','title','first_name','last_name','project_title','project_type','description','date','end_date','year','level','hours','fee'],
+  course:['citizen_id','title','first_name','last_name','course_name','course_level','description','issue_date','expired_date','score','year','category','level','hours','fee']
+};
+
 const LEVELS = ['', 'school', 'district', 'regional', 'national', 'international'];
 const ATT_HEADERS = ['attachment_id','entry_id','citizen_id','student_id','class_room','type','file_id','file_name','mime_type','drive_url','created_at'];
 const REVIEW_HEADERS = ['review_id','entry_id','citizen_id','student_id','type','feedback','due_date','status','created_at','updated_at','resubmitted_at','request_id'];
@@ -711,9 +719,9 @@ function teacherStudentResponse_(teacherToken, studentId) {
 function teacherExportResponse_(teacherToken, grade, type) {
   requireTeacherSession_(teacherToken);
   grade = String(grade || 'all').trim();
-  type = String(type || 'all').trim();
+  type = String(type || '').trim();
   if (['all','ม.4','ม.5','ม.6'].indexOf(grade) === -1) throw new Error('ระดับชั้นสำหรับส่งออกไม่ถูกต้อง');
-  if (type !== 'all' && !CONFIG[type]) throw new Error('ประเภทข้อมูลสำหรับส่งออกไม่ถูกต้อง');
+  if (!CONFIG[type] || !EXPORT_HEADERS[type]) throw new Error('กรุณาเลือกประเภทข้อมูลสำหรับส่งออก');
 
   const ss = SpreadsheetApp.openById(DATA_SPREADSHEET_ID);
   const studentMap = {};
@@ -722,37 +730,26 @@ function teacherExportResponse_(teacherToken, grade, type) {
     studentMap[student.citizen_id] = student;
   });
 
-  const types = type === 'all' ? Object.keys(CONFIG) : [type];
-  const recordHeaders = [];
-  types.forEach(recordType => CONFIG[recordType].headers.forEach(header => {
-    if (['citizen_id','title','first_name','last_name'].indexOf(header) === -1 && recordHeaders.indexOf(header) === -1) recordHeaders.push(header);
-  }));
-  const headers = ['student_id','class_room','student_name','record_type','record_type_label'].concat(recordHeaders, ['entry_id']);
+  const cfg = CONFIG[type];
+  const headers = EXPORT_HEADERS[type].slice();
   const rows = [];
 
-  types.forEach(recordType => {
-    const cfg = CONFIG[recordType];
-    const sh = ss.getSheetByName(cfg.sheet);
-    if (!sh || sh.getLastRow() < 2) return;
-    const entryIdColumn = recordEntryIdColumn_(sh, cfg, false);
-    const width = Math.max(cfg.headers.length, entryIdColumn || 0);
-    const values = sh.getRange(2, 1, sh.getLastRow() - 1, width).getDisplayValues();
+  const sh = ss.getSheetByName(cfg.sheet);
+  if (sh && sh.getLastRow() >= 2) {
+    const values = sh.getRange(2, 1, sh.getLastRow() - 1, cfg.headers.length).getDisplayValues();
     values.forEach(source => {
-      const student = studentMap[String(source[0] || '').trim()];
-      if (!student) return;
+      if (!studentMap[String(source[0] || '').trim()]) return;
       const record = {};
       cfg.headers.forEach((header, index) => record[header] = source[index] || '');
-      rows.push([
-        student.student_id,
-        student.class_room,
-        String(student.title || '') + String(student.first_name || '') + ' ' + String(student.last_name || ''),
-        recordType,
-        teacherTypeLabel_(recordType)
-      ].concat(recordHeaders.map(header => record[header] || ''), [entryIdColumn ? source[entryIdColumn - 1] || '' : '']));
+      rows.push(headers.map(header => record[header] || ''));
     });
-  });
+  }
 
-  rows.sort((a, b) => String(a[1]).localeCompare(String(b[1]), 'th') || Number(a[0] || 0) - Number(b[0] || 0));
+  rows.sort((a, b) => {
+    const aStudent = studentMap[String(a[0] || '').trim()] || {};
+    const bStudent = studentMap[String(b[0] || '').trim()] || {};
+    return String(aStudent.class_room || '').localeCompare(String(bStudent.class_room || ''), 'th') || Number(aStudent.student_id || 0) - Number(bStudent.student_id || 0);
+  });
   return {
     headers:headers,
     rows:rows,
@@ -765,10 +762,6 @@ function teacherExportResponse_(teacherToken, grade, type) {
 function teacherGradeOf_(classRoom) {
   const match = String(classRoom || '').replace(/\s+/g, '').match(/^ม\.?(4|5|6)/);
   return match ? 'ม.' + match[1] : '';
-}
-
-function teacherTypeLabel_(type) {
-  return ({activity:'กิจกรรม', prize:'รางวัล', project:'โครงงาน', course:'หลักสูตร / Certificate'})[type] || type;
 }
 
 function teacherReviewResponse_(teacherToken, payload) {
