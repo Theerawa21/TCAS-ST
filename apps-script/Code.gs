@@ -82,7 +82,7 @@ function doPost(e) {
     else if (action === 'teacherLogin') result = teacherLogin_(payload.teacher_code);
     else if (action === 'teacherDashboard') result = teacherDashboardResponse_(payload.teacher_token, payload.force_refresh);
     else if (action === 'teacherStudent') result = teacherStudentResponse_(payload.teacher_token, payload.student_id);
-    else if (action === 'teacherExport') result = teacherExportResponse_(payload.teacher_token, payload.grade, payload.type);
+    else if (action === 'teacherExport') result = teacherExportResponse_(payload.teacher_token, payload.grade, payload.type, payload.room, payload.date_from, payload.date_to);
     else if (action === 'teacherReview') result = teacherReviewResponse_(payload.teacher_token, payload);
     else if (action === 'teacherLogout') result = teacherLogout_(payload.teacher_token);
     else throw new Error('คำสั่งไม่ถูกต้อง');
@@ -716,22 +716,31 @@ function teacherStudentResponse_(teacherToken, studentId) {
   };
 }
 
-function teacherExportResponse_(teacherToken, grade, type) {
+function teacherExportResponse_(teacherToken, grade, type, room, dateFrom, dateTo) {
   requireTeacherSession_(teacherToken);
   grade = String(grade || 'all').trim();
   type = String(type || '').trim();
+  room = String(room || 'all').trim();
+  dateFrom = String(dateFrom || '').trim();
+  dateTo = String(dateTo || '').trim();
   if (['all','ม.4','ม.5','ม.6'].indexOf(grade) === -1) throw new Error('ระดับชั้นสำหรับส่งออกไม่ถูกต้อง');
   if (!CONFIG[type] || !EXPORT_HEADERS[type]) throw new Error('กรุณาเลือกประเภทข้อมูลสำหรับส่งออก');
+  if (room.length > 50) throw new Error('ชื่อห้องเรียนไม่ถูกต้อง');
+  if (dateFrom && !/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) throw new Error('วันที่เริ่มต้นไม่ถูกต้อง');
+  if (dateTo && !/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) throw new Error('วันที่สิ้นสุดไม่ถูกต้อง');
+  if (dateFrom && dateTo && dateFrom > dateTo) throw new Error('วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด');
 
   const ss = SpreadsheetApp.openById(DATA_SPREADSHEET_ID);
   const studentMap = {};
   getAllActiveStudents_(ss).forEach(student => {
     if (grade !== 'all' && teacherGradeOf_(student.class_room) !== grade) return;
+    if (room !== 'all' && String(student.class_room || '').trim() !== room) return;
     studentMap[student.citizen_id] = student;
   });
 
   const cfg = CONFIG[type];
   const headers = EXPORT_HEADERS[type].slice();
+  const dateHeader = type === 'course' ? 'issue_date' : 'date';
   const rows = [];
 
   const sh = ss.getSheetByName(cfg.sheet);
@@ -741,6 +750,9 @@ function teacherExportResponse_(teacherToken, grade, type) {
       if (!studentMap[String(source[0] || '').trim()]) return;
       const record = {};
       cfg.headers.forEach((header, index) => record[header] = source[index] || '');
+      const recordDate = teacherDateKey_(record[dateHeader]);
+      if (dateFrom && (!recordDate || recordDate < dateFrom)) return;
+      if (dateTo && (!recordDate || recordDate > dateTo)) return;
       rows.push(headers.map(header => record[header] || ''));
     });
   }
@@ -754,9 +766,29 @@ function teacherExportResponse_(teacherToken, grade, type) {
     headers:headers,
     rows:rows,
     grade:grade,
+    room:room,
     type:type,
+    date_from:dateFrom,
+    date_to:dateTo,
     generated_at:Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss')
   };
+}
+
+function teacherDateKey_(value) {
+  const text = String(value || '').trim();
+  let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  let year, month, day;
+  if (match) {
+    year = Number(match[1]); month = Number(match[2]); day = Number(match[3]);
+  } else {
+    match = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+    if (!match) return '';
+    day = Number(match[1]); month = Number(match[2]); year = Number(match[3]);
+  }
+  if (year > 2400) year -= 543;
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return '';
+  return [String(year).padStart(4, '0'), String(month).padStart(2, '0'), String(day).padStart(2, '0')].join('-');
 }
 
 function teacherGradeOf_(classRoom) {
