@@ -14,6 +14,7 @@
 - Spreadsheet: `1seV4fk00kr62MiWd9i6IxjHqVZaTLQinZmb7MDXDzc4`
 - Student sheet: `students`
 - Teacher dashboard export: ดาวน์โหลด CSV แยกตามระดับ ม.4 / ม.5 / ม.6 และประเภทผลงาน โดยไม่ส่งออกเลขบัตรประชาชน
+- Student authentication: ใช้รหัสนักเรียนร่วมกับเลขท้ายบัตรประชาชน 4 หลัก และไม่ส่งเลขบัตรประชาชนเต็มกลับ Browser
 - Evidence folder: `1BPExo71uPO1WPc1L1GP3mlK1TDDZx2Kb`
 - เว็บไซต์: `https://theerawa21.github.io/TCAS-ST/`
 

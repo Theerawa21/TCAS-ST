@@ -64,7 +64,7 @@ function doPost(e) {
     requireAllowedOrigin_(p.origin);
     let result;
 
-    if (action === 'studentLogin') result = studentLogin_(payload.student_id);
+    if (action === 'studentLogin') result = studentLogin_(payload.student_id, payload.citizen_last4);
     else if (action === 'studentEmail') result = updateStudentEmail_(payload.student_token, payload.email);
     else if (action === 'studentRecords') result = recordsResponse_(payload.student_token);
     else if (action === 'studentLogout') result = studentLogout_(payload.student_token);
@@ -86,16 +86,19 @@ function doPost(e) {
 }
 
 /* ========================= STUDENTS ========================= */
-function studentLogin_(id) {
+function studentLogin_(id, citizenLast4) {
   id = normalizeDigits_(id);
+  citizenLast4 = normalizeDigits_(citizenLast4);
   if (!id) throw new Error('กรุณากรอกรหัสนักเรียน');
+  if (!/^\d{4}$/.test(citizenLast4)) throw new Error('กรุณากรอกเลขท้ายบัตรประชาชน 4 หลัก');
 
   const rateKey = 'student:' + secureKey_(id);
   requireLoginAllowed_(rateKey);
   const s = lookupStudent_(id);
-  if (!s || (s.status && s.status !== 'กำลังศึกษาอยู่')) {
+  const expectedLast4 = s ? normalizeDigits_(s.citizen_id).slice(-4) : '----';
+  if (!s || (s.status && s.status !== 'กำลังศึกษาอยู่') || !secureEqual_(citizenLast4, expectedLast4)) {
     const rate = recordLoginFailure_(rateKey);
-    throwLoginFailure_(rate, 'ไม่พบรหัสนักเรียนหรือสถานะนักเรียนไม่ถูกต้อง');
+    throwLoginFailure_(rate, 'รหัสนักเรียนหรือเลขท้ายบัตรประชาชนไม่ถูกต้อง');
   }
 
   clearLoginFailures_(rateKey);

@@ -80,6 +80,6 @@ $('teacherType')?.addEventListener('change',e=>{typeFilter=e.target.value;render
 $('teacherExportBtn')?.addEventListener('click',exportTeacherData);
 $('teacherDetailBackBtn')?.addEventListener('click',()=>showTeacher('teacherDashboardView'));
 
-if(!document.querySelector('script[data-evidence]')){const s=document.createElement('script');s.src='attachments.js?v=20260826-v28';s.dataset.evidence='1';document.body.appendChild(s)}
+if(!document.querySelector('script[data-evidence]')){const s=document.createElement('script');s.src='attachments.js?v=20260826-v29';s.dataset.evidence='1';document.body.appendChild(s)}
 })();
 
