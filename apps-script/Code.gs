@@ -74,6 +74,7 @@ function doPost(e) {
     else if (action === 'teacherLogin') result = teacherLogin_(payload.teacher_code);
     else if (action === 'teacherDashboard') result = teacherDashboardResponse_(payload.teacher_token, payload.force_refresh);
     else if (action === 'teacherStudent') result = teacherStudentResponse_(payload.teacher_token, payload.student_id);
+    else if (action === 'teacherExport') result = teacherExportResponse_(payload.teacher_token, payload.grade, payload.type);
     else if (action === 'teacherReview') result = teacherReviewResponse_(payload.teacher_token, payload);
     else if (action === 'teacherLogout') result = teacherLogout_(payload.teacher_token);
     else throw new Error('คำสั่งไม่ถูกต้อง');
@@ -702,6 +703,69 @@ function teacherStudentResponse_(teacherToken, studentId) {
     student:teacherPublicStudent_(student),
     records:getStudentRecords_(student).map(publicRecord_)
   };
+}
+
+function teacherExportResponse_(teacherToken, grade, type) {
+  requireTeacherSession_(teacherToken);
+  grade = String(grade || 'all').trim();
+  type = String(type || 'all').trim();
+  if (['all','ม.4','ม.5','ม.6'].indexOf(grade) === -1) throw new Error('ระดับชั้นสำหรับส่งออกไม่ถูกต้อง');
+  if (type !== 'all' && !CONFIG[type]) throw new Error('ประเภทข้อมูลสำหรับส่งออกไม่ถูกต้อง');
+
+  const ss = SpreadsheetApp.openById(DATA_SPREADSHEET_ID);
+  const studentMap = {};
+  getAllActiveStudents_(ss).forEach(student => {
+    if (grade !== 'all' && teacherGradeOf_(student.class_room) !== grade) return;
+    studentMap[student.citizen_id] = student;
+  });
+
+  const types = type === 'all' ? Object.keys(CONFIG) : [type];
+  const recordHeaders = [];
+  types.forEach(recordType => CONFIG[recordType].headers.forEach(header => {
+    if (['citizen_id','title','first_name','last_name'].indexOf(header) === -1 && recordHeaders.indexOf(header) === -1) recordHeaders.push(header);
+  }));
+  const headers = ['student_id','class_room','student_name','record_type','record_type_label'].concat(recordHeaders, ['entry_id']);
+  const rows = [];
+
+  types.forEach(recordType => {
+    const cfg = CONFIG[recordType];
+    const sh = ss.getSheetByName(cfg.sheet);
+    if (!sh || sh.getLastRow() < 2) return;
+    const entryIdColumn = recordEntryIdColumn_(sh, cfg, false);
+    const width = Math.max(cfg.headers.length, entryIdColumn || 0);
+    const values = sh.getRange(2, 1, sh.getLastRow() - 1, width).getDisplayValues();
+    values.forEach(source => {
+      const student = studentMap[String(source[0] || '').trim()];
+      if (!student) return;
+      const record = {};
+      cfg.headers.forEach((header, index) => record[header] = source[index] || '');
+      rows.push([
+        student.student_id,
+        student.class_room,
+        String(student.title || '') + String(student.first_name || '') + ' ' + String(student.last_name || ''),
+        recordType,
+        teacherTypeLabel_(recordType)
+      ].concat(recordHeaders.map(header => record[header] || ''), [entryIdColumn ? source[entryIdColumn - 1] || '' : '']));
+    });
+  });
+
+  rows.sort((a, b) => String(a[1]).localeCompare(String(b[1]), 'th') || Number(a[0] || 0) - Number(b[0] || 0));
+  return {
+    headers:headers,
+    rows:rows,
+    grade:grade,
+    type:type,
+    generated_at:Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss')
+  };
+}
+
+function teacherGradeOf_(classRoom) {
+  const match = String(classRoom || '').replace(/\s+/g, '').match(/^ม\.?(4|5|6)/);
+  return match ? 'ม.' + match[1] : '';
+}
+
+function teacherTypeLabel_(type) {
+  return ({activity:'กิจกรรม', prize:'รางวัล', project:'โครงงาน', course:'หลักสูตร / Certificate'})[type] || type;
 }
 
 function teacherReviewResponse_(teacherToken, payload) {
