@@ -665,7 +665,7 @@ function markReviewResubmitted_(entryId, citizenId) {
 
 function teacherLogin_(teacherCode) {
   const expected = scriptProperty_('TEACHER_CODE');
-  if (!/^\d{6}$/.test(expected)) throw new Error('ยังไม่ได้ตั้งค่า TEACHER_CODE เป็นตัวเลข 6 หลักใน Script Properties');
+  if (!isValidTeacherCode_(expected)) throw new Error('ยังไม่ได้ตั้งค่า TEACHER_CODE เป็นรหัสอย่างน้อย 8 ตัวอักษรใน Script Properties');
   teacherCode = String(teacherCode || '').trim();
   const rateKey = 'teacher:' + secureKey_('main');
   requireLoginAllowed_(rateKey);
@@ -1113,7 +1113,7 @@ function setupConfig_() {
 
   const errors = [];
   if (!teacherCode) errors.push('ยังไม่ได้ตั้งค่า TEACHER_CODE ใน Script Properties');
-  if (teacherCode && !/^\d{6}$/.test(teacherCode)) errors.push('TEACHER_CODE ต้องเป็นตัวเลข 6 หลัก');
+  if (teacherCode && !isValidTeacherCode_(teacherCode)) errors.push('TEACHER_CODE ต้องมีอย่างน้อย 8 ตัวอักษรและไม่เกิน 64 ตัวอักษร');
   const secret = String(props.getProperty('SESSION_SECRET') || '').trim();
   if (secret.length < 32) errors.push('SESSION_SECRET ต้องมีอย่างน้อย 32 ตัวอักษร');
   const origin = String(props.getProperty('ALLOWED_ORIGIN') || '').trim();
@@ -1134,6 +1134,11 @@ function setupConfig_() {
 /* ========================= HELPERS ========================= */
 function scriptProperty_(name) {
   return String(PropertiesService.getScriptProperties().getProperty(name) || '').trim();
+}
+
+function isValidTeacherCode_(value) {
+  const code = String(value || '').trim();
+  return code.length >= 8 && code.length <= 64;
 }
 
 function sessionSecret_() {
