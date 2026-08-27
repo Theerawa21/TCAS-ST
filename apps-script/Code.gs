@@ -1269,6 +1269,12 @@ function clearLoginFailures_(rateKey) {
   CacheService.getScriptCache().remove(loginRateCacheKey_(rateKey));
 }
 
+// เรียกจาก Apps Script editor เมื่อต้องปลดล็อกการเข้าสู่ระบบครูโดยผู้ดูแล
+function resetTeacherLoginLock() {
+  clearLoginFailures_('teacher:' + secureKey_('main'));
+  return {success:true};
+}
+
 function normalize_(v) {
   return v === null || v === undefined ? '' : String(v).trim();
 }

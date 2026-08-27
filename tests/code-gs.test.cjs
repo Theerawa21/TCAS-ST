@@ -39,4 +39,25 @@ function makeContext(teacherCode) {
   );
 }
 
+{
+  const removed = [];
+  const context = {
+    console,
+    PropertiesService: {
+      getScriptProperties: () => ({getProperty: () => 'x'.repeat(64)})
+    },
+    CacheService: {
+      getScriptCache: () => ({remove: (key) => removed.push(key)})
+    },
+    Utilities: {
+      computeHmacSha256Signature: () => [1, 2, 3],
+      base64EncodeWebSafe: () => 'teacher-key'
+    }
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  context.resetTeacherLoginLock?.();
+  assert.deepEqual(removed, ['login-rate:teacher:teacher-key']);
+}
+
 console.log('Code.gs teacher-code validation tests passed');
