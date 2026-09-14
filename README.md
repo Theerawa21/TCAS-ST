@@ -14,6 +14,7 @@
 - Spreadsheet: `1seV4fk00kr62MiWd9i6IxjHqVZaTLQinZmb7MDXDzc4`
 - Student sheet: `students`
 - Teacher dashboard export: ดาวน์โหลด CSV แยกตามระดับ ม.4 / ม.5 / ม.6, ห้องเรียน, ประเภท และช่วงวันที่ของผลงาน โดยหัวคอลัมน์ตรงกับ activities.csv, prizes.csv, projects.csv และ certs-courses.csv (สำหรับครูที่เข้าสู่ระบบเท่านั้น)
+- ส่งออกรายบุคคล: กรอกรหัสนักเรียนแบบตรงตัว (รักษาเลขศูนย์นำหน้า) ในหน้าส่งออกของครู ตัวกรองชั้น/ห้อง/ประเภท/วันที่ยังใช้ร่วมกัน หากไม่พบรหัสหรือไม่ตรงตัวกรองจะไม่ดาวน์โหลดไฟล์ หากเว้นว่างจะใช้การส่งออกเดิม ต้อง Deploy Code.gs เวอร์ชันใหม่ก่อนใช้ตัวกรองนี้ ไม่ต้องเพิ่ม Script Properties หรือคอลัมน์ชีต
 - Student authentication: ใช้รหัสนักเรียนร่วมกับเลขท้ายบัตรประชาชน 4 หลัก และไม่ส่งเลขบัตรประชาชนเต็มกลับ Browser
 - Evidence folder: `1BPExo71uPO1WPc1L1GP3mlK1TDDZx2Kb`
 - เว็บไซต์: `https://theerawa21.github.io/TCAS-ST/`

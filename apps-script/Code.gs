@@ -82,7 +82,7 @@ function doPost(e) {
     else if (action === 'teacherLogin') result = teacherLogin_(payload.teacher_code);
     else if (action === 'teacherDashboard') result = teacherDashboardResponse_(payload.teacher_token, payload.force_refresh);
     else if (action === 'teacherStudent') result = teacherStudentResponse_(payload.teacher_token, payload.student_id);
-    else if (action === 'teacherExport') result = teacherExportResponse_(payload.teacher_token, payload.grade, payload.type, payload.room, payload.date_from, payload.date_to);
+    else if (action === 'teacherExport') result = teacherExportResponse_(payload.teacher_token, payload.grade, payload.type, payload.room, payload.date_from, payload.date_to, payload.student_id);
     else if (action === 'teacherReview') result = teacherReviewResponse_(payload.teacher_token, payload);
     else if (action === 'teacherLogout') result = teacherLogout_(payload.teacher_token);
     else throw new Error('คำสั่งไม่ถูกต้อง');
@@ -716,13 +716,15 @@ function teacherStudentResponse_(teacherToken, studentId) {
   };
 }
 
-function teacherExportResponse_(teacherToken, grade, type, room, dateFrom, dateTo) {
+function teacherExportResponse_(teacherToken, grade, type, room, dateFrom, dateTo, studentId) {
   requireTeacherSession_(teacherToken);
   grade = String(grade || 'all').trim();
   type = String(type || '').trim();
   room = String(room || 'all').trim();
   dateFrom = String(dateFrom || '').trim();
   dateTo = String(dateTo || '').trim();
+  studentId = String(studentId || '').trim();
+  if (studentId && !/^\d{1,20}$/.test(studentId)) throw new Error('รหัสนักเรียนต้องเป็นตัวเลขไม่เกิน 20 หลัก');
   if (['all','ม.4','ม.5','ม.6'].indexOf(grade) === -1) throw new Error('ระดับชั้นสำหรับส่งออกไม่ถูกต้อง');
   if (!CONFIG[type] || !EXPORT_HEADERS[type]) throw new Error('กรุณาเลือกประเภทข้อมูลสำหรับส่งออก');
   if (room.length > 50) throw new Error('ชื่อห้องเรียนไม่ถูกต้อง');
@@ -733,6 +735,7 @@ function teacherExportResponse_(teacherToken, grade, type, room, dateFrom, dateT
   const ss = SpreadsheetApp.openById(DATA_SPREADSHEET_ID);
   const studentMap = {};
   getAllActiveStudents_(ss).forEach(student => {
+    if (studentId && String(student.student_id || '').trim() !== studentId) return;
     if (grade !== 'all' && teacherGradeOf_(student.class_room) !== grade) return;
     if (room !== 'all' && String(student.class_room || '').trim() !== room) return;
     studentMap[student.citizen_id] = student;
@@ -770,6 +773,7 @@ function teacherExportResponse_(teacherToken, grade, type, room, dateFrom, dateT
     type:type,
     date_from:dateFrom,
     date_to:dateTo,
+    student_id:studentId,
     generated_at:Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd HH:mm:ss')
   };
 }
